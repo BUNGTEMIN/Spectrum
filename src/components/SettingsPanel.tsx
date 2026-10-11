@@ -25,6 +25,7 @@ import {
   BackgroundType,
   VisualizerPreset,
   ThemeMode,
+  AudioState,
 } from '../types/visualizer';
 import { PresetsManager, BUILT_IN_PRESETS } from '../utils/presetsManager';
 
@@ -32,9 +33,9 @@ const SKIN_VARIANTS: { id: VisualizerSkin; name: string; desc: string; icon: str
   {
     id: 'circular-bars',
     name: 'Circular Bars',
-    desc: 'Batang spektrum melingkar Avee Player dengan ujung bulat & kilau neon',
+    desc: 'Batang spektrum melingkar Nu dengan ujung bulat & kilau neon',
     icon: '📊',
-    badge: 'Avee Classic',
+    badge: 'Nu Classic',
   },
   {
     id: 'waveform-lines',
@@ -77,6 +78,7 @@ interface SettingsPanelProps {
   activePresetId?: string | null;
   onApplyPreset: (preset: VisualizerPreset) => void;
   initialTab?: SettingsTab;
+  audioState?: AudioState;
 }
 
 const COLOR_PRESETS: ColorPreset[] = [
@@ -122,6 +124,21 @@ const COLOR_PRESETS: ColorPreset[] = [
   },
 ];
 
+export const POPULAR_NEON_SWATCHES = [
+  { name: 'Cyan Neon', hex: '#06b6d4' },
+  { name: 'Cyber Magenta', hex: '#ec4899' },
+  { name: 'Neon Violet', hex: '#8b5cf6' },
+  { name: 'Acid Lime', hex: '#22c55e' },
+  { name: 'Solar Amber', hex: '#f59e0b' },
+  { name: 'Sunset Flame', hex: '#f97316' },
+  { name: 'Laser Red', hex: '#ef4444' },
+  { name: 'Hyper Blue', hex: '#3b82f6' },
+  { name: 'Emerald Glow', hex: '#10b981' },
+  { name: 'Deep Purple', hex: '#a855f7' },
+  { name: 'Rose Pink', hex: '#f43f5e' },
+  { name: 'Pure White', hex: '#ffffff' },
+];
+
 export type SettingsTab = 'presets' | 'visualizer' | 'colors' | 'reactivity' | 'background';
 
 export const SettingsPanel: React.FC<SettingsPanelProps> = ({
@@ -135,6 +152,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   activePresetId,
   onApplyPreset,
   initialTab = 'presets',
+  audioState,
 }) => {
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab);
   const [presetsList, setPresetsList] = useState<VisualizerPreset[]>([]);
@@ -220,7 +238,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `aveeflow-presets-${Date.now()}.json`;
+    a.download = `nu-presets-${Date.now()}.json`;
     a.click();
     showToast('File preset JSON berhasil diekspor!');
   };
@@ -279,7 +297,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   : 'bg-cyan-100 text-cyan-700 border-cyan-300'
               }`}
             >
-              Avee Engine
+              Nu Engine
             </span>
           </div>
           <p className="text-xs text-neutral-400 mt-0.5">
@@ -783,7 +801,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   </div>
                 </div>
                 <span className="text-[10px] px-2 py-0.5 rounded-full font-mono bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-semibold capitalize">
-                  {SKIN_VARIANTS.find((s) => s.id === (config.skin || 'circular-bars'))?.badge || 'Avee Classic'}
+                  {SKIN_VARIANTS.find((s) => s.id === (config.skin || 'circular-bars'))?.badge || 'Nu Classic'}
                 </span>
               </div>
 
@@ -858,7 +876,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               </label>
               <div className="grid grid-cols-2 gap-2">
                 {[
-                  { id: 'radial-bars', name: 'Radial Bars (Avee)' },
+                  { id: 'radial-bars', name: 'Radial Bars (Nu)' },
                   { id: 'radial-mirror', name: 'Symmetrical Mirror' },
                   { id: 'radial-curve', name: 'Neon Waveform Curve' },
                   { id: 'radial-dots', name: 'Pins & Dots' },
@@ -881,6 +899,88 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     {s.name}
                   </button>
                 ))}
+              </div>
+            </div>
+
+            {/* Primary Neon Spectrum Color Quick Picker in Tab 1 */}
+            <div
+              className={`p-3 rounded-xl border transition-all ${
+                isDark
+                  ? 'bg-neutral-900/80 border-cyan-500/30 shadow-md shadow-cyan-950/20'
+                  : 'bg-white border-cyan-400/50 shadow-sm'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold flex items-center gap-1.5 text-white">
+                  <span>🎨</span>
+                  <span>Warna Neon Utama Spektrum (Primary Color)</span>
+                </span>
+                <span
+                  className="text-[10px] font-mono px-2 py-0.5 rounded font-bold uppercase border"
+                  style={{
+                    backgroundColor: `${config.primaryColor}20`,
+                    color: config.primaryColor,
+                    borderColor: `${config.primaryColor}50`,
+                  }}
+                >
+                  {config.primaryColor.toUpperCase()}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="relative shrink-0">
+                  <input
+                    type="color"
+                    id="primaryNeonColorTab1"
+                    value={config.primaryColor}
+                    onChange={(e) => update('primaryColor', e.target.value)}
+                    className="w-10 h-10 rounded-xl cursor-pointer border border-white/20 p-0.5 bg-neutral-900"
+                    title="Klik untuk memilih warna spektrum bebas"
+                  />
+                </div>
+
+                <div className="flex-1 space-y-1">
+                  <div className="flex items-center justify-between text-[11px] text-neutral-400">
+                    <span>Pilihan Warna Neon:</span>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('colors')}
+                      className="text-cyan-400 hover:underline cursor-pointer text-[10px] font-medium"
+                    >
+                      Buka Tab Warna Lengkap →
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-6 sm:grid-cols-12 gap-1.5">
+                    {POPULAR_NEON_SWATCHES.map((swatch) => {
+                      const isSel = config.primaryColor.toLowerCase() === swatch.hex.toLowerCase();
+                      return (
+                        <button
+                          key={swatch.hex}
+                          type="button"
+                          onClick={() => update('primaryColor', swatch.hex)}
+                          title={`${swatch.name} (${swatch.hex})`}
+                          className={`w-6 h-6 rounded-lg border flex items-center justify-center transition-all cursor-pointer ${
+                            isSel
+                              ? 'ring-2 ring-white scale-110 shadow-md'
+                              : 'hover:scale-105 border-white/20'
+                          }`}
+                          style={{
+                            backgroundColor: swatch.hex,
+                            boxShadow: isSel ? `0 0 10px ${swatch.hex}` : undefined,
+                          }}
+                        >
+                          {isSel && (
+                            <Check
+                              className={`w-3 h-3 stroke-[3] ${
+                                swatch.hex === '#ffffff' ? 'text-black' : 'text-white'
+                              }`}
+                            />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -1182,58 +1282,266 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             </div>
 
             {/* Custom Pickers */}
-            <div className="space-y-3 pt-2 border-t border-white/5">
-              <label className="text-xs font-medium text-neutral-400 uppercase tracking-wider">
-                Pilihan Warna Kustom (Color Picker)
+            <div className="space-y-4 pt-2 border-t border-white/5">
+              <label className="text-xs font-semibold text-neutral-300 uppercase tracking-wider flex items-center gap-1.5">
+                <span>🎨</span>
+                <span>Kustomisasi Warna Spektrum (Color Pickers)</span>
               </label>
 
+              {/* 1. Primary Neon Color (Warna Utama Spektrum) */}
               <div
-                className={`flex items-center justify-between p-2 rounded-xl border ${
-                  isDark ? 'bg-white/5 border-white/5' : 'bg-white border-neutral-200 shadow-sm'
+                className={`p-3.5 rounded-xl border transition-all ${
+                  isDark
+                    ? 'bg-neutral-900/90 border-cyan-500/30 shadow-lg shadow-cyan-950/20 ring-1 ring-cyan-500/20'
+                    : 'bg-white border-cyan-400/50 shadow-md ring-1 ring-cyan-400/20'
                 }`}
               >
-                <span className="text-xs">Warna Pangkal (Primary)</span>
-                <input
-                  type="color"
-                  value={config.primaryColor}
-                  onChange={(e) => update('primaryColor', e.target.value)}
-                  className="w-8 h-8 rounded-lg cursor-pointer bg-transparent border-0"
-                />
+                <div className="flex items-center justify-between mb-2.5">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="w-3.5 h-3.5 rounded-full border border-white/40 shadow-sm"
+                      style={{
+                        backgroundColor: config.primaryColor,
+                        boxShadow: `0 0 10px ${config.primaryColor}`,
+                      }}
+                    />
+                    <div>
+                      <span className="text-xs font-bold text-white block">
+                        Warna Neon Utama Spektrum (Primary Color)
+                      </span>
+                      <span className="text-[10px] text-neutral-400">
+                        Warna dominan batang spektrum, border cover, dan efek glow neon
+                      </span>
+                    </div>
+                  </div>
+
+                  <span
+                    className="font-mono-code text-xs px-2.5 py-0.5 rounded-lg font-bold border"
+                    style={{
+                      backgroundColor: `${config.primaryColor}15`,
+                      color: config.primaryColor,
+                      borderColor: `${config.primaryColor}40`,
+                    }}
+                  >
+                    {config.primaryColor.toUpperCase()}
+                  </span>
+                </div>
+
+                {/* Interactive Color Controls: Picker Swatch + Hex Input */}
+                <div className="flex items-center gap-3 bg-white/5 p-2 rounded-xl border border-white/5">
+                  <div className="relative shrink-0">
+                    <input
+                      type="color"
+                      id="primaryColorInput"
+                      value={config.primaryColor}
+                      onChange={(e) => update('primaryColor', e.target.value)}
+                      className="w-10 h-10 rounded-xl cursor-pointer border border-white/20 p-0.5 bg-neutral-900"
+                      title="Klik untuk memilih warna bebas"
+                    />
+                  </div>
+
+                  <div className="flex-1 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 font-mono-code text-xs bg-black/40 border border-white/10 px-2.5 py-1.5 rounded-lg text-white">
+                      <span className="text-neutral-500 font-bold">#</span>
+                      <input
+                        type="text"
+                        value={config.primaryColor.replace('#', '').toUpperCase()}
+                        onChange={(e) => {
+                          const hex = e.target.value.replace(/[^0-9A-Fa-f]/g, '').slice(0, 6);
+                          if (hex.length === 6) {
+                            update('primaryColor', `#${hex}`);
+                          }
+                        }}
+                        maxLength={6}
+                        className="w-16 bg-transparent outline-none font-bold uppercase tracking-wider"
+                      />
+                    </div>
+                    <span className="text-[11px] text-neutral-400 hidden sm:inline">
+                      Live preview seketika pada visualizer
+                    </span>
+                  </div>
+                </div>
+
+                {/* Popular Neon Swatches Row */}
+                <div className="mt-2.5 pt-2 border-t border-white/10">
+                  <span className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider block mb-1.5">
+                    Pilihan Neon Populer:
+                  </span>
+                  <div className="grid grid-cols-6 sm:grid-cols-12 gap-1.5">
+                    {POPULAR_NEON_SWATCHES.map((swatch) => {
+                      const isSelected = config.primaryColor.toLowerCase() === swatch.hex.toLowerCase();
+                      return (
+                        <button
+                          key={swatch.hex}
+                          type="button"
+                          onClick={() => update('primaryColor', swatch.hex)}
+                          title={`${swatch.name} (${swatch.hex})`}
+                          className={`w-7 h-7 rounded-lg border flex items-center justify-center transition-all cursor-pointer ${
+                            isSelected
+                              ? 'ring-2 ring-white scale-110 shadow-lg'
+                              : 'hover:scale-105 border-white/20 opacity-90 hover:opacity-100'
+                          }`}
+                          style={{
+                            backgroundColor: swatch.hex,
+                            boxShadow: isSelected ? `0 0 12px ${swatch.hex}` : undefined,
+                          }}
+                        >
+                          {isSelected && (
+                            <Check
+                              className={`w-3.5 h-3.5 stroke-[3] ${
+                                swatch.hex === '#ffffff' ? 'text-black' : 'text-white'
+                              }`}
+                            />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
 
-              <div
-                className={`flex items-center justify-between p-2 rounded-xl border ${
-                  isDark ? 'bg-white/5 border-white/5' : 'bg-white border-neutral-200 shadow-sm'
-                }`}
-              >
-                <span className="text-xs">Warna Tengah (Secondary)</span>
-                <input
-                  type="color"
-                  value={config.secondaryColor}
-                  onChange={(e) => update('secondaryColor', e.target.value)}
-                  className="w-8 h-8 rounded-lg cursor-pointer bg-transparent border-0"
-                />
-              </div>
+              {/* 2. Secondary & Accent Pickers */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div
+                  className={`p-2.5 rounded-xl border flex items-center justify-between ${
+                    isDark ? 'bg-white/5 border-white/5' : 'bg-white border-neutral-200 shadow-sm'
+                  }`}
+                >
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-semibold block">Warna Tengah (Secondary)</span>
+                    <span className="font-mono-code text-[11px] text-neutral-400">
+                      {config.secondaryColor.toUpperCase()}
+                    </span>
+                  </div>
+                  <input
+                    type="color"
+                    value={config.secondaryColor}
+                    onChange={(e) => update('secondaryColor', e.target.value)}
+                    className="w-8 h-8 rounded-lg cursor-pointer bg-transparent border-0"
+                  />
+                </div>
 
-              <div
-                className={`flex items-center justify-between p-2 rounded-xl border ${
-                  isDark ? 'bg-white/5 border-white/5' : 'bg-white border-neutral-200 shadow-sm'
-                }`}
-              >
-                <span className="text-xs">Warna Ujung (Accent)</span>
-                <input
-                  type="color"
-                  value={config.accentColor}
-                  onChange={(e) => update('accentColor', e.target.value)}
-                  className="w-8 h-8 rounded-lg cursor-pointer bg-transparent border-0"
-                />
+                <div
+                  className={`p-2.5 rounded-xl border flex items-center justify-between ${
+                    isDark ? 'bg-white/5 border-white/5' : 'bg-white border-neutral-200 shadow-sm'
+                  }`}
+                >
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-semibold block">Warna Ujung (Accent)</span>
+                    <span className="font-mono-code text-[11px] text-neutral-400">
+                      {config.accentColor.toUpperCase()}
+                    </span>
+                  </div>
+                  <input
+                    type="color"
+                    value={config.accentColor}
+                    onChange={(e) => update('accentColor', e.target.value)}
+                    className="w-8 h-8 rounded-lg cursor-pointer bg-transparent border-0"
+                  />
+                </div>
               </div>
             </div>
 
-            {/* Glow Intensity */}
-            <div className="space-y-1.5 pt-2 border-t border-white/5">
+            {/* Post-Processing Radiant Bloom Card */}
+            <div
+              className={`p-3.5 rounded-xl border transition-all ${
+                (config.bloomEffect ?? true)
+                  ? isDark
+                    ? 'bg-purple-950/30 border-purple-500/40 shadow-md shadow-purple-950/30'
+                    : 'bg-purple-50 border-purple-400 shadow-sm'
+                  : isDark
+                  ? 'bg-white/5 border-white/5'
+                  : 'bg-white border-neutral-200'
+              }`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <label className="flex items-start gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={config.bloomEffect ?? true}
+                    onChange={(e) => update('bloomEffect', e.target.checked)}
+                    className="rounded bg-white/10 text-purple-500 focus:ring-0 cursor-pointer mt-0.5"
+                  />
+                  <div>
+                    <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <span>✨</span>
+                      <span>Efek Bloom Pasca-Pemrosesan (Radiant Spectral Bloom)</span>
+                    </span>
+                    <p className="text-[11px] text-neutral-400 mt-0.5 leading-snug">
+                      Menghasilkan pendaran halo radiasi cahaya yang lembut dan sinematik di sekeliling garis spektrum audio melalui filter Gaussian blur multi-tahap offscreen dengan blending aditif.
+                    </p>
+                  </div>
+                </label>
+                <span
+                  className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold uppercase shrink-0 ${
+                    (config.bloomEffect ?? true)
+                      ? 'bg-purple-500 text-white'
+                      : 'bg-white/10 text-neutral-400'
+                  }`}
+                >
+                  {(config.bloomEffect ?? true) ? 'AKTIF' : 'NONAKTIF'}
+                </span>
+              </div>
+
+              {(config.bloomEffect ?? true) && (
+                <div className="mt-3 pt-2.5 border-t border-white/10 space-y-3">
+                  {/* Bloom Intensity */}
+                  <div className="space-y-1">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-neutral-300 font-medium text-[11px]">Intensitas Radiasi Bloom</span>
+                      <span className="font-mono-code text-purple-400 font-bold bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/20 text-xs">
+                        {((config.bloomIntensity ?? 0.85) * 100).toFixed(0)}%
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0.1}
+                      max={2.0}
+                      step={0.05}
+                      value={config.bloomIntensity ?? 0.85}
+                      onChange={(e) => update('bloomIntensity', parseFloat(e.target.value))}
+                      className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
+                      style={{ accentColor: '#a855f7' }}
+                    />
+                    <div className="flex justify-between text-[10px] text-neutral-400">
+                      <span>Halus (20%)</span>
+                      <span>Seimbang (85%)</span>
+                      <span>Intens / Ethereal (200%)</span>
+                    </div>
+                  </div>
+
+                  {/* Bloom Radius / Softness */}
+                  <div className="space-y-1">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-neutral-300 font-medium text-[11px]">Radius & Kelembutan Pendaran</span>
+                      <span className="font-mono-code text-purple-400 font-bold bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/20 text-xs">
+                        {config.bloomRadius ?? 18}px
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min={4}
+                      max={40}
+                      step={2}
+                      value={config.bloomRadius ?? 18}
+                      onChange={(e) => update('bloomRadius', parseInt(e.target.value))}
+                      className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
+                      style={{ accentColor: '#a855f7' }}
+                    />
+                    <div className="flex justify-between text-[10px] text-neutral-400">
+                      <span>Tajam (4px)</span>
+                      <span>Menyebar Halus (18px)</span>
+                      <span>Sangat Luas (40px)</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Standard Canvas Shadow Glow Intensity */}
+            <div className="space-y-1.5 pt-1">
               <div className="flex justify-between text-xs">
-                <span>Intensitas Glow & Bayangan Neon</span>
+                <span>Intensitas Bayangan Neon (ShadowBlur Core)</span>
                 <span className="font-mono-code text-cyan-500 font-semibold">{config.glowIntensity}px</span>
               </div>
               <input
@@ -1334,6 +1642,52 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 onChange={(e) => update('pulseIntensity', parseFloat(e.target.value))}
                 className="w-full"
               />
+            </div>
+
+            {/* Automated Beat Detection & BPM Tracking */}
+            <div
+              className={`p-3.5 rounded-xl border transition-all ${
+                isDark ? 'bg-white/5 border-cyan-500/20' : 'bg-white border-cyan-500/30 shadow-sm'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-base">⚡</span>
+                  <div>
+                    <span className="text-xs font-bold text-white block">
+                      Deteksi Beat & Sinkronisasi BPM Otomatis
+                    </span>
+                    <span className="text-[10px] text-neutral-400">
+                      Mengunci tempo lagu agar elemen kanvas berdenyut harmonis
+                    </span>
+                  </div>
+                </div>
+
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={config.bpmSyncPulse ?? true}
+                    onChange={(e) => update('bpmSyncPulse', e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-neutral-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-500"></div>
+                </label>
+              </div>
+
+              {/* Status and BPM Display */}
+              <div className="flex items-center justify-between bg-black/25 px-2.5 py-1.5 rounded-lg border border-white/5 text-xs">
+                <span className="text-[11px] text-neutral-300 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                  <span>Tempo Terlacak:</span>
+                </span>
+                <span className="font-mono font-bold text-cyan-300 text-xs">
+                  {audioState?.isDetectingBpm
+                    ? 'Menganalisis audio...'
+                    : audioState?.bpm
+                    ? `${audioState.bpm} BPM (Terkunci)`
+                    : '126 BPM (Live Synth)'}
+                </span>
+              </div>
             </div>
 
             {/* Pulse Sensitivity (Beat Frequency Threshold) */}

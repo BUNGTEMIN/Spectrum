@@ -1,6 +1,6 @@
 {
-  "name": "AveeFlow - Web Audio Visualizer & Video Exporter",
-  "description": "Audio visualizer bergaya Avee Player dengan spektrum melingkar reaktif bass, partikel beat, dan ekspor video MP4/WebM langsung dari browser.",
+  "name": "Nu - Web Audio Visualizer & Video Exporter",
+  "description": "Audio visualizer modern bergaya Nu dengan spektrum melingkar reaktif bass, partikel beat, dan ekspor video MP4/WebM langsung dari browser.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

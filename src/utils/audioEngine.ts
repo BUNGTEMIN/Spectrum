@@ -7,6 +7,15 @@
  * - Built-in procedural demo synth generator (EDM / Synthwave beats)
  */
 
+import {
+  detectBpmFromAudioBuffer,
+  RealtimeBeatTracker,
+  BeatAnalysisResult,
+  extractWaveformPeaks,
+  generateDemoWaveform,
+} from './beatDetector';
+import { BeatData } from '../types/visualizer';
+
 /**
  * Calculates 2nd-order (biquad) Low-Shelf IIR filter coefficients
  * based on the Audio EQ Cookbook by Robert Bristow-Johnson.
@@ -58,6 +67,10 @@ export class AudioEngine {
   private connectedElements: WeakMap<HTMLMediaElement, MediaElementAudioSourceNode> = new WeakMap();
   private dataArray: Uint8Array<ArrayBuffer> | null = null;
   private timeDataArray: Uint8Array<ArrayBuffer> | null = null;
+
+  // Automated Beat Detection & Real-time BPM Tracker
+  private beatTracker: RealtimeBeatTracker = new RealtimeBeatTracker(126);
+  private lastBassEnergy: number = 0;
 
   // Synthesized demo generator state
   private demoOscillators: { stop: () => void }[] = [];
@@ -209,6 +222,23 @@ export class AudioEngine {
   }
 
   /**
+   * Calculates overall average amplitude of the audio signal (normalized 0.0 to 1.0)
+   */
+  public getAverageAmplitude(): number {
+    if (!this.analyser || !this.timeDataArray) {
+      return 0;
+    }
+    this.analyser.getByteTimeDomainData(this.timeDataArray);
+    const len = this.timeDataArray.length;
+    if (len === 0) return 0;
+    let sum = 0;
+    for (let i = 0; i < len; i++) {
+      sum += Math.abs(this.timeDataArray[i] - 128);
+    }
+    return (sum / len) / 128;
+  }
+
+  /**
    * Calculates sub-bass energy (roughly 20Hz - 160Hz) normalized between 0.0 and 1.0
    */
   public getBassEnergy(sensitivity: number = 1.0): { bass: number; mid: number; treble: number } {
@@ -249,18 +279,93 @@ export class AudioEngine {
     const mid = Math.min(1.2, rawMid * sensitivity);
     const treble = Math.min(1.2, rawTreble * sensitivity);
 
+    this.lastBassEnergy = bass;
+
     return { bass, mid, treble };
   }
 
   /**
+   * Automatically analyzes an uploaded audio/video track file or buffer,
+   * detects its BPM tempo and beat phase grid, and locks the beat tracker.
+   */
+  public async analyzeTrackBpm(source: Blob | File | ArrayBuffer): Promise<BeatAnalysisResult> {
+    const ctx = this.getAudioContext();
+    let arrayBuffer: ArrayBuffer;
+    if (source instanceof ArrayBuffer) {
+      arrayBuffer = source.slice(0);
+    } else {
+      arrayBuffer = await (source as Blob).arrayBuffer();
+    }
+
+    try {
+      // Decode audio data to extract PCM samples
+      const audioBuffer = await ctx.decodeAudioData(arrayBuffer.slice(0));
+      const result = await detectBpmFromAudioBuffer(audioBuffer);
+      // Extract normalized waveform peaks for visual scrubbing
+      result.waveformPeaks = extractWaveformPeaks(audioBuffer, 120);
+      this.beatTracker.setBpm(result.bpm, result.beatOffset, result.confidence, true);
+      return result;
+    } catch (err) {
+      console.warn('BPM analysis decode error, falling back to real-time beat tracker:', err);
+      const fallbackResult: BeatAnalysisResult = {
+        bpm: 124,
+        confidence: 0.55,
+        beatOffset: 0,
+        beatInterval: 60 / 124,
+        waveformPeaks: generateDemoWaveform(120),
+      };
+      this.beatTracker.setBpm(124, 0, 0.55, false);
+      return fallbackResult;
+    }
+  }
+
+  /**
+   * Generates or returns demo waveform peaks
+   */
+  public getDemoWaveform(bars: number = 120): number[] {
+    return generateDemoWaveform(bars);
+  }
+
+  /**
+   * Retrieves real-time beat phase, tempo, and pulse intensity for canvas rendering
+   */
+  public getBeatData(currentTime: number = 0): BeatData {
+    return this.beatTracker.getBeatState(currentTime, this.lastBassEnergy);
+  }
+
+  /**
+   * Returns currently tracked BPM
+   */
+  public getBpm(): number {
+    return this.beatTracker.getBpm();
+  }
+
+  /**
+   * Returns whether the BPM tempo is locked from track analysis
+   */
+  public isBpmLocked(): boolean {
+    return this.beatTracker.isTempoLocked();
+  }
+
+  /**
+   * Manually sets or overrides BPM tempo
+   */
+  public setManualBpm(bpm: number, offset: number = 0) {
+    this.beatTracker.setBpm(bpm, offset, 0.95, true);
+  }
+
+  /**
    * Built-in Synthesizer for instant Demo Beat:
-   * Generates a 124 BPM synthwave/EDM electronic rhythm (punchy kick, deep bass arp, hi-hats, synth lead)
+   * Generates a 126 BPM synthwave/EDM electronic rhythm (punchy kick, deep bass arp, hi-hats, synth lead)
    * so user can see and hear the visualizer in full glory right away!
    */
   public startDemoTrack(onStep?: (step: number) => void): boolean {
     const ctx = this.getAudioContext();
     this.stopDemo();
     this.isDemoPlaying = true;
+
+    // Lock tempo to 126 BPM for synthesized beat
+    this.beatTracker.setBpm(126, 0, 1.0, true);
 
     const bpm = 126;
     const stepDuration = 60 / bpm / 4; // 16th note

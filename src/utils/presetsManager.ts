@@ -2,8 +2,8 @@ import { VisualizerConfig, VisualizerPreset } from '../types/visualizer';
 
 export const BUILT_IN_PRESETS: VisualizerPreset[] = [
   {
-    id: 'cyberpunk-avee',
-    name: 'Cyberpunk Avee',
+    id: 'cyberpunk-nu',
+    name: 'Cyberpunk Nu',
     description: 'Spektrum radial neon cyan & ungu dengan hentakan bass punchy',
     isBuiltIn: true,
     createdAt: 1700000000000,
@@ -18,6 +18,9 @@ export const BUILT_IN_PRESETS: VisualizerPreset[] = [
       rotationSpeed: 0.5,
       reactRotation: true,
       glowIntensity: 18,
+      bloomEffect: true,
+      bloomIntensity: 0.85,
+      bloomRadius: 18,
       primaryColor: '#06b6d4',
       secondaryColor: '#8b5cf6',
       accentColor: '#ec4899',
@@ -43,8 +46,9 @@ export const BUILT_IN_PRESETS: VisualizerPreset[] = [
       bgDim: 0.65,
       bgBlur: 0,
       showTrackInfo: true,
-      trackTitle: 'Cyberpunk Avee',
+      trackTitle: 'Cyberpunk Nu',
       trackArtist: 'Electronic Bass Visualizer',
+      bpmSyncPulse: true,
     },
   },
   {
@@ -64,6 +68,9 @@ export const BUILT_IN_PRESETS: VisualizerPreset[] = [
       rotationSpeed: 0.8,
       reactRotation: true,
       glowIntensity: 22,
+      bloomEffect: true,
+      bloomIntensity: 1.1,
+      bloomRadius: 22,
       primaryColor: '#eab308',
       secondaryColor: '#f97316',
       accentColor: '#ffffff',
@@ -110,6 +117,9 @@ export const BUILT_IN_PRESETS: VisualizerPreset[] = [
       rotationSpeed: 0.3,
       reactRotation: false,
       glowIntensity: 24,
+      bloomEffect: true,
+      bloomIntensity: 0.9,
+      bloomRadius: 16,
       primaryColor: '#10b981',
       secondaryColor: '#06b6d4',
       accentColor: '#a7f3d0',
@@ -156,6 +166,9 @@ export const BUILT_IN_PRESETS: VisualizerPreset[] = [
       rotationSpeed: 0.4,
       reactRotation: true,
       glowIntensity: 20,
+      bloomEffect: true,
+      bloomIntensity: 1.0,
+      bloomRadius: 20,
       primaryColor: '#f97316',
       secondaryColor: '#ec4899',
       accentColor: '#fbbf24',
@@ -202,6 +215,9 @@ export const BUILT_IN_PRESETS: VisualizerPreset[] = [
       rotationSpeed: 0.2,
       reactRotation: false,
       glowIntensity: 12,
+      bloomEffect: true,
+      bloomIntensity: 0.5,
+      bloomRadius: 12,
       primaryColor: '#e0e7ff',
       secondaryColor: '#38bdf8',
       accentColor: '#ffffff',
@@ -248,6 +264,9 @@ export const BUILT_IN_PRESETS: VisualizerPreset[] = [
       rotationSpeed: 1.0,
       reactRotation: true,
       glowIntensity: 26,
+      bloomEffect: true,
+      bloomIntensity: 1.3,
+      bloomRadius: 24,
       primaryColor: '#ef4444',
       secondaryColor: '#a855f7',
       accentColor: '#facc15',
@@ -279,12 +298,16 @@ export const BUILT_IN_PRESETS: VisualizerPreset[] = [
   },
 ];
 
-const STORAGE_KEY = 'aveeflow_user_presets';
+const STORAGE_KEY = 'nu_user_presets';
+const LEGACY_STORAGE_KEY = 'aveeflow_user_presets';
 
 export class PresetsManager {
   public static getUserPresets(): VisualizerPreset[] {
     try {
-      const data = localStorage.getItem(STORAGE_KEY);
+      let data = localStorage.getItem(STORAGE_KEY);
+      if (!data) {
+        data = localStorage.getItem(LEGACY_STORAGE_KEY);
+      }
       if (!data) return [];
       const parsed = JSON.parse(data);
       if (Array.isArray(parsed)) {

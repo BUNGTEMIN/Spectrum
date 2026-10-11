@@ -1,5 +1,5 @@
 /**
- * AveeFlow - Web Audio Visualizer ala Avee Player & Video Exporter
+ * Nu - Web Audio Visualizer & Video Exporter
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
@@ -27,7 +27,7 @@ const DEFAULT_PRESET = BUILT_IN_PRESETS[0];
 export default function App() {
   // Theme state: dark / light
   const [theme, setTheme] = useState<ThemeMode>(() => {
-    const saved = localStorage.getItem('aveeflow_theme');
+    const saved = localStorage.getItem('nu_theme') || localStorage.getItem('aveeflow_theme');
     return saved === 'light' ? 'light' : 'dark';
   });
 
@@ -45,6 +45,10 @@ export default function App() {
     coverUrl: null,
     bgUrl: null,
     videoElement: null,
+    bpm: 126,
+    isDetectingBpm: false,
+    bpmConfidence: 1.0,
+    waveformPeaks: globalAudioEngine.getDemoWaveform(120),
   });
 
   const [recordingState, setRecordingState] = useState<RecordingState>({
@@ -72,7 +76,7 @@ export default function App() {
   const handleToggleTheme = useCallback(() => {
     setTheme((prev) => {
       const next = prev === 'dark' ? 'light' : 'dark';
-      localStorage.setItem('aveeflow_theme', next);
+      localStorage.setItem('nu_theme', next);
       return next;
     });
   }, []);
@@ -161,6 +165,10 @@ export default function App() {
       isPlaying: true,
       currentTime: 0,
       duration: 0,
+      bpm: 126,
+      isDetectingBpm: false,
+      bpmConfidence: 1.0,
+      waveformPeaks: globalAudioEngine.getDemoWaveform(120),
     }));
 
     setConfig((prev) => ({
@@ -175,6 +183,8 @@ export default function App() {
     const activeEl = audioState.fileType === 'video' ? videoElementRef.current : audioElementRef.current;
     if (activeEl && !isNaN(seconds)) {
       activeEl.currentTime = seconds;
+      setAudioState((prev) => ({ ...prev, currentTime: seconds }));
+    } else if (audioState.fileType === 'demo' && !isNaN(seconds)) {
       setAudioState((prev) => ({ ...prev, currentTime: seconds }));
     }
   };
@@ -247,6 +257,7 @@ export default function App() {
         fileName: file.name,
         fileType: 'video',
         videoElement: videoEl,
+        isDetectingBpm: true,
       }));
 
       // Automatically switch background to video if requested
@@ -276,6 +287,7 @@ export default function App() {
         fileName: file.name,
         fileType: 'audio',
         videoElement: null,
+        isDetectingBpm: true,
       }));
 
       setConfig((prev) => ({
@@ -284,6 +296,28 @@ export default function App() {
         trackArtist: 'Uploaded MP3 Audio',
       }));
     }
+
+    // Automated beat detection algorithm: Analyze uploaded track buffer for BPM tempo tracking
+    globalAudioEngine
+      .analyzeTrackBpm(file)
+      .then((result) => {
+        setAudioState((prev) => ({
+          ...prev,
+          isDetectingBpm: false,
+          bpm: result.bpm,
+          bpmConfidence: result.confidence,
+          waveformPeaks: result.waveformPeaks || prev.waveformPeaks,
+        }));
+      })
+      .catch((err) => {
+        console.warn('BPM track analysis failed:', err);
+        setAudioState((prev) => ({
+          ...prev,
+          isDetectingBpm: false,
+          bpm: 124,
+          waveformPeaks: prev.waveformPeaks || globalAudioEngine.getDemoWaveform(120),
+        }));
+      });
 
     setIsUploadOpen(false);
   };
@@ -400,7 +434,7 @@ export default function App() {
           status: 'completed',
           format: ext,
           downloadUrl,
-          fileName: `aveeflow-visualizer-${Date.now()}.${ext}`,
+          fileName: `nu-visualizer-${Date.now()}.${ext}`,
         }));
       },
       (error) => {
@@ -424,7 +458,7 @@ export default function App() {
     const htmlContent = generateStandaloneHTML();
     const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
     const url = URL.createObjectURL(blob);
-    downloadVideoFile(url, 'avee-player-visualizer-standalone.html');
+    downloadVideoFile(url, 'nu-visualizer-standalone.html');
   };
 
   const isDark = theme === 'dark';
@@ -471,6 +505,9 @@ export default function App() {
         }}
         onChangeTransientShakeIntensity={(intensity) => {
           setConfig((prev) => ({ ...prev, transientShakeIntensity: intensity }));
+        }}
+        onChangePrimaryColor={(color) => {
+          setConfig((prev) => ({ ...prev, primaryColor: color }));
         }}
         onOpenSettings={() => handleOpenSettings('visualizer')}
       />
@@ -521,6 +558,7 @@ export default function App() {
         activePresetId={activePresetId}
         onApplyPreset={handleApplyPreset}
         initialTab={settingsTab}
+        audioState={audioState}
       />
 
       {/* Export / Record Video Modal */}

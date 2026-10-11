@@ -1,4 +1,4 @@
-import { VisualizerConfig, ParticleType, ThemeMode } from '../types/visualizer';
+import { VisualizerConfig, ParticleType, ThemeMode, BeatData } from '../types/visualizer';
 
 interface Particle {
   x: number;
@@ -18,6 +18,7 @@ export class VisualizerRenderer {
   private currentRotation: number = 0;
   private coverRotation: number = 0;
   private smoothedBass: number = 0;
+  private smoothedAmplitude: number = 0;
   private beatPulseIntensity: number = 0;
   private defaultCoverCanvas: HTMLCanvasElement | null = null;
 
@@ -29,12 +30,40 @@ export class VisualizerRenderer {
   private transientRotationalVelocity: number = 0;
   private transientFlashIntensity: number = 0;
 
+  // Post-processing bloom offscreen buffer
+  private bloomCanvas: HTMLCanvasElement | null = null;
+  private bloomCtx: CanvasRenderingContext2D | null = null;
+
   constructor() {
     this.createDefaultCoverArt();
   }
 
   /**
-   * Generates a procedural high-res Avee Player album cover art
+   * Lazily initializes and caches a downsampled offscreen canvas for high-performance bloom post-processing
+   */
+  private getBloomContext(width: number, height: number): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } | null {
+    const bloomW = Math.max(64, Math.floor(width / 2));
+    const bloomH = Math.max(64, Math.floor(height / 2));
+
+    if (!this.bloomCanvas) {
+      this.bloomCanvas = document.createElement('canvas');
+      this.bloomCanvas.width = bloomW;
+      this.bloomCanvas.height = bloomH;
+      this.bloomCtx = this.bloomCanvas.getContext('2d');
+    } else if (this.bloomCanvas.width !== bloomW || this.bloomCanvas.height !== bloomH) {
+      this.bloomCanvas.width = bloomW;
+      this.bloomCanvas.height = bloomH;
+    }
+
+    if (!this.bloomCtx) {
+      this.bloomCtx = this.bloomCanvas.getContext('2d');
+    }
+
+    return this.bloomCtx ? { canvas: this.bloomCanvas, ctx: this.bloomCtx } : null;
+  }
+
+  /**
+   * Generates a procedural high-res Nu album cover art
    * (glowing neon glyph with vinyl ridges and gradient)
    */
   private createDefaultCoverArt() {
@@ -74,7 +103,7 @@ export class VisualizerRenderer {
     ctx.strokeStyle = grad;
     ctx.stroke();
 
-    // Center emblem (Stylized Avee Player Audio Waveform Bars)
+    // Center emblem (Stylized Nu Audio Waveform Bars)
     ctx.save();
     ctx.translate(size / 2, size / 2);
     const barCount = 7;
@@ -133,7 +162,9 @@ export class VisualizerRenderer {
     coverImg: HTMLImageElement | null,
     bgImg: HTMLImageElement | null,
     bgVideo: HTMLVideoElement | null,
-    theme: ThemeMode = 'dark'
+    theme: ThemeMode = 'dark',
+    avgAmplitude?: number,
+    beatData?: BeatData
   ) {
     const ctx = canvas.getContext('2d', { alpha: false });
     if (!ctx) return;
@@ -146,6 +177,22 @@ export class VisualizerRenderer {
     // Smooth bass transition for fluid bounce
     this.smoothedBass += (bassEnergy.bass - this.smoothedBass) * 0.28;
     const bass = this.smoothedBass;
+
+    // Calculate and smooth average audio amplitude for background dynamic pulsing depth
+    let currentAmp = avgAmplitude;
+    if (currentAmp === undefined) {
+      let sum = 0;
+      const len = timeData.length;
+      if (len > 0) {
+        for (let i = 0; i < len; i++) {
+          sum += Math.abs(timeData[i] - 128);
+        }
+        currentAmp = (sum / len) / 128;
+      } else {
+        currentAmp = 0;
+      }
+    }
+    this.smoothedAmplitude += (currentAmp - this.smoothedAmplitude) * 0.22;
 
     // HIGH-FREQUENCY TRANSIENT PEAK DETECTION & VISUAL SHAKE:
     // Analyzes high-frequency spectrum bands (>3.2kHz) and waveform derivatives to detect
@@ -206,7 +253,7 @@ export class VisualizerRenderer {
 
     // 1. Draw Background / Motion Blur Trail Clear
     // When particleTrails is enabled, uses semi-transparent fillRect with alpha instead of full opaque clear
-    this.drawBackground(ctx, width, height, config, bgImg, bgVideo, bass, theme);
+    this.drawBackground(ctx, width, height, config, bgImg, bgVideo, bass, theme, this.smoothedAmplitude, beatData?.beatPulse ?? 0);
 
     // Apply Center-Pivot Multi-Axis Shake (Translation + Rotation + Zoom Surge)
     ctx.save();
@@ -245,7 +292,7 @@ export class VisualizerRenderer {
     }
 
     // 2. Draw Floating & Bursting Particles
-    this.drawParticles(ctx, width, height, config, bass, theme);
+    this.drawParticles(ctx, width, height, config, bass, theme, beatData);
 
     // 3. Update Visualizer Rotations
     let rotSpeed = (config.rotationSpeed * 0.003);
@@ -277,6 +324,14 @@ export class VisualizerRenderer {
       targetPulse = Math.min(1.8, (excess / Math.max(0.1, 1 - beatThreshold)) * Math.sqrt(pulseSens) * 1.4);
     }
 
+    // AUTOMATED BEAT DETECTION & BPM RHYTHMIC TRACKING:
+    // Syncs the canvas elements in mathematically perfect rhythm with the detected BPM of the track
+    const isBpmSync = config.bpmSyncPulse ?? true;
+    if (isBpmSync && beatData && beatData.beatPulse > 0.03) {
+      const rhythmicTarget = beatData.beatPulse * (0.68 + bass * 0.65) * Math.sqrt(pulseSens);
+      targetPulse = Math.max(targetPulse, rhythmicTarget);
+    }
+
     // Dynamic attack/decay envelope for clean, punchy rhythmic size shifts
     if (targetPulse > this.beatPulseIntensity) {
       this.beatPulseIntensity += (targetPulse - this.beatPulseIntensity) * 0.72; // Snappy attack on kick
@@ -284,17 +339,58 @@ export class VisualizerRenderer {
       this.beatPulseIntensity *= 0.86; // Smooth musical decay
     }
 
-    // Visual size shift (pulseScale) triggered accurately by detected beat frequencies exceeding threshold
+    // Visual size shift (pulseScale) triggered accurately in perfect rhythm with music
     const pulseShift = this.beatPulseIntensity * config.pulseIntensity;
     const pulseScale = 1 + pulseShift;
     ctx.scale(pulseScale, pulseScale);
 
-    // Draw Spectrum Bars
+    // 1. Draw Primary Sharp Spectrum Bars directly onto main context
     this.drawSpectrum(ctx, freqData, timeData, config, bass);
 
-    // Draw Center Album Cover Art with Glow Border
+    // 2. Post-Processing Bloom Pass: Generates a soft, radiant glow around bright spectral lines
+    const isBloomEnabled = config.bloomEffect ?? true;
+    if (isBloomEnabled) {
+      const bloomTarget = this.getBloomContext(width, height);
+      if (bloomTarget) {
+        const { canvas: bCanvas, ctx: bCtx } = bloomTarget;
+        const bW = bCanvas.width;
+        const bH = bCanvas.height;
+
+        // Render spectral lines to offscreen downsampled bloom buffer
+        bCtx.clearRect(0, 0, bW, bH);
+        bCtx.save();
+        bCtx.translate(bW / 2, bH / 2);
+        bCtx.scale(bW / width, bH / height);
+        this.drawSpectrum(bCtx, freqData, timeData, config, bass);
+        bCtx.restore();
+
+        // Calculate dynamic reactive bloom parameters
+        const baseIntensity = Math.max(0.1, config.bloomIntensity ?? 0.85);
+        const baseRadius = Math.max(2, config.bloomRadius ?? 18);
+        const dynRadius = baseRadius * (1 + bass * 0.22 + (this.transientShakeEnergy || 0) * 0.12);
+        const dynIntensity = baseIntensity * (1 + bass * 0.25);
+
+        ctx.save();
+        ctx.globalCompositeOperation = 'screen';
+
+        // Stage 1: Wide Radiant Diffuse Bloom Halo
+        ctx.globalAlpha = Math.min(1.0, dynIntensity * 0.72);
+        ctx.filter = `blur(${Math.max(2, dynRadius)}px)`;
+        ctx.drawImage(bCanvas, -centerX, -centerY, width, height);
+
+        // Stage 2: Tight Specular High-Luminance Core Radiance
+        ctx.globalAlpha = Math.min(1.0, dynIntensity * 0.45);
+        ctx.filter = `blur(${Math.max(1, dynRadius * 0.35)}px)`;
+        ctx.drawImage(bCanvas, -centerX, -centerY, width, height);
+
+        ctx.filter = 'none';
+        ctx.restore();
+      }
+    }
+
+    // 3. Draw Center Album Cover Art with Glow Border
     if (config.showCoverArt && config.style !== 'linear-bars') {
-      this.drawCenterCover(ctx, config, coverImg, bass);
+      this.drawCenterCover(ctx, config, coverImg, bass, beatData?.beatPulse ?? 0);
     }
 
     ctx.restore();
@@ -385,10 +481,18 @@ export class VisualizerRenderer {
     bgImg: HTMLImageElement | null,
     bgVideo: HTMLVideoElement | null,
     bass: number,
-    theme: ThemeMode
+    theme: ThemeMode,
+    avgAmplitude: number = 0,
+    beatPulse: number = 0
   ) {
     const isDark = theme === 'dark';
     const trailAlpha = config.trailPersistence ?? 0.2;
+
+    // Dynamic depth scaling: dynamically scale background image size based on the average amplitude of the audio
+    // and synchronized BPM beat pulse, creating an organic 'pulsing' depth zoom effect in rhythm with the music
+    const isBpmSync = config.bpmSyncPulse ?? true;
+    const rhythmicBoost = isBpmSync ? beatPulse * 0.07 : 0;
+    const pulseDepth = 1.0 + Math.min(0.28, avgAmplitude * 0.16 + bass * 0.03 + rhythmicBoost);
 
     // PARTICLE TRAILS MOTION BLUR:
     // When enabled, modify the CanvasVisualizer to use a semi-transparent clearRect approach
@@ -399,17 +503,17 @@ export class VisualizerRenderer {
         ctx.globalAlpha = Math.max(0.1, trailAlpha);
         const vRatio = bgVideo.videoWidth / bgVideo.videoHeight;
         const cRatio = width / height;
-        let dw = width;
-        let dh = height;
-        let dx = 0;
-        let dy = 0;
+        let baseW = width;
+        let baseH = height;
         if (vRatio > cRatio) {
-          dw = height * vRatio;
-          dx = (width - dw) / 2;
+          baseW = height * vRatio;
         } else {
-          dh = width / vRatio;
-          dy = (height - dh) / 2;
+          baseH = width / vRatio;
         }
+        const dw = baseW * pulseDepth;
+        const dh = baseH * pulseDepth;
+        const dx = (width - dw) / 2;
+        const dy = (height - dh) / 2;
         ctx.drawImage(bgVideo, dx, dy, dw, dh);
         ctx.restore();
 
@@ -424,17 +528,18 @@ export class VisualizerRenderer {
         ctx.globalAlpha = Math.max(0.1, trailAlpha);
         const iRatio = bgImg.naturalWidth / bgImg.naturalHeight;
         const cRatio = width / height;
-        let dw = width;
-        let dh = height;
-        let dx = 0;
-        let dy = 0;
+        let baseW = width;
+        let baseH = height;
         if (iRatio > cRatio) {
-          dw = height * iRatio;
-          dx = (width - dw) / 2;
+          baseW = height * iRatio;
         } else {
-          dh = width / iRatio;
-          dy = (height - dh) / 2;
+          baseH = width / iRatio;
         }
+        // Scaled dynamically by average audio amplitude for pulsing depth effect
+        const dw = baseW * pulseDepth;
+        const dh = baseH * pulseDepth;
+        const dx = (width - dw) / 2;
+        const dy = (height - dh) / 2;
         ctx.drawImage(bgImg, dx, dy, dw, dh);
         ctx.restore();
 
@@ -481,18 +586,19 @@ export class VisualizerRenderer {
       // Draw video frame to cover canvas
       const vRatio = bgVideo.videoWidth / bgVideo.videoHeight;
       const cRatio = width / height;
-      let dw = width;
-      let dh = height;
-      let dx = 0;
-      let dy = 0;
+      let baseW = width;
+      let baseH = height;
 
       if (vRatio > cRatio) {
-        dw = height * vRatio;
-        dx = (width - dw) / 2;
+        baseW = height * vRatio;
       } else {
-        dh = width / vRatio;
-        dy = (height - dh) / 2;
+        baseH = width / vRatio;
       }
+
+      const dw = baseW * pulseDepth;
+      const dh = baseH * pulseDepth;
+      const dx = (width - dw) / 2;
+      const dy = (height - dh) / 2;
 
       ctx.drawImage(bgVideo, dx, dy, dw, dh);
 
@@ -502,21 +608,23 @@ export class VisualizerRenderer {
         ctx.fillRect(0, 0, width, height);
       }
     } else if (config.bgType === 'image' && bgImg && bgImg.complete && bgImg.naturalWidth > 0) {
-      // Draw image background
+      // Draw image background with audio-reactive dynamic pulsing depth scaling
       const iRatio = bgImg.naturalWidth / bgImg.naturalHeight;
       const cRatio = width / height;
-      let dw = width;
-      let dh = height;
-      let dx = 0;
-      let dy = 0;
+      let baseW = width;
+      let baseH = height;
 
       if (iRatio > cRatio) {
-        dw = height * iRatio;
-        dx = (width - dw) / 2;
+        baseW = height * iRatio;
       } else {
-        dh = width / iRatio;
-        dy = (height - dh) / 2;
+        baseH = width / iRatio;
       }
+
+      // Dynamic scale based on average audio amplitude for pulsing depth effect
+      const dw = baseW * pulseDepth;
+      const dh = baseH * pulseDepth;
+      const dx = (width - dw) / 2;
+      const dy = (height - dh) / 2;
 
       ctx.drawImage(bgImg, dx, dy, dw, dh);
 
@@ -595,7 +703,8 @@ export class VisualizerRenderer {
     height: number,
     config: VisualizerConfig,
     bass: number,
-    theme: ThemeMode
+    theme: ThemeMode,
+    beatData?: BeatData
   ) {
     if (config.particleCount <= 0) return;
 
@@ -605,10 +714,12 @@ export class VisualizerRenderer {
 
     const centerX = width / 2;
     const centerY = height / 2;
-    const isKick = config.particleExplosion && bass > 0.65;
+    const isKick = config.particleExplosion && (bass > 0.65 || (beatData?.isBeat ?? false));
+    const isBeatDrop = (beatData?.beatPulse ?? 0) > 0.55;
     const isTransientHit = (config.transientShake ?? true) && this.transientShakeEnergy > 0.25;
     const speedMultiplier = config.particleSpeed * (
-      (isKick ? 1 + bass * 2.8 : 1) * (isTransientHit ? 1 + this.transientShakeEnergy * 1.4 : 1)
+      (isKick ? 1 + bass * 2.8 : (isBeatDrop ? 1 + (beatData?.beatPulse ?? 0) * 1.6 : 1)) *
+      (isTransientHit ? 1 + this.transientShakeEnergy * 1.4 : 1)
     );
 
     ctx.save();
@@ -738,7 +849,7 @@ export class VisualizerRenderer {
   }
 
   /**
-   * Skin Variant: Circular Bars (Classic Avee Player Bars)
+   * Skin Variant: Circular Bars (Classic Nu Bars)
    */
   private drawCircularBarsSkin(
     ctx: CanvasRenderingContext2D,
@@ -1162,9 +1273,12 @@ export class VisualizerRenderer {
     ctx.strokeStyle = config.primaryColor;
     ctx.stroke();
 
-    // Translucent fill
-    ctx.fillStyle = `rgba(6, 182, 212, 0.15)`;
+    // Translucent fill matching primary neon color
+    ctx.save();
+    ctx.globalAlpha = 0.15;
+    ctx.fillStyle = config.primaryColor;
     ctx.fill();
+    ctx.restore();
   }
 
   private drawLinearBars(
@@ -1352,7 +1466,8 @@ export class VisualizerRenderer {
     ctx: CanvasRenderingContext2D,
     config: VisualizerConfig,
     coverImg: HTMLImageElement | null,
-    bass: number
+    bass: number,
+    beatPulse: number = 0
   ) {
     const radius = config.innerRadius - 8;
     if (radius <= 10) return;
@@ -1364,13 +1479,14 @@ export class VisualizerRenderer {
       ctx.rotate(this.coverRotation);
     }
 
-    // Outer glowing border ring
+    // Outer glowing border ring with subtle rhythmic beat pulse expansion
+    const ringExpansion = (config.bpmSyncPulse ?? true) ? beatPulse * 3.5 : 0;
     ctx.beginPath();
-    ctx.arc(0, 0, radius + 2, 0, Math.PI * 2);
-    ctx.lineWidth = 3;
+    ctx.arc(0, 0, radius + 2 + ringExpansion, 0, Math.PI * 2);
+    ctx.lineWidth = 3 + (beatPulse > 0.4 ? 1 : 0);
     ctx.strokeStyle = config.primaryColor;
     if (config.glowIntensity > 0) {
-      ctx.shadowBlur = config.glowIntensity + bass * 12;
+      ctx.shadowBlur = config.glowIntensity + bass * 12 + beatPulse * 14;
       ctx.shadowColor = config.primaryColor;
     }
     ctx.stroke();

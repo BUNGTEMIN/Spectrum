@@ -10,7 +10,7 @@ export function generateStandaloneHTML(): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Avee Player Audio Visualizer - Standalone Edition</title>
+  <title>Nu Audio Visualizer - Standalone Edition</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -253,7 +253,7 @@ export function generateStandaloneHTML(): string {
   <header>
     <div style="display:flex; align-items:center; gap:10px;">
       <div class="logo">
-        <span style="color:#06b6d4;">✦</span> AveeFlow
+        <span style="color:#06b6d4;">✦</span> Nu
       </div>
       <span class="badge">Standalone</span>
     </div>
@@ -280,7 +280,7 @@ export function generateStandaloneHTML(): string {
 
     <!-- Presets Section -->
     <div class="setting-item">
-      <div class="setting-label"><span>Pilih Preset Avee</span></div>
+      <div class="setting-label"><span>Pilih Preset Nu</span></div>
       <div class="preset-grid">
         <button class="preset-btn" onclick="applyPreset('cyberpunk')">⚡ Cyberpunk</button>
         <button class="preset-btn" onclick="applyPreset('solar')">🔥 Solar EDM</button>
@@ -294,7 +294,7 @@ export function generateStandaloneHTML(): string {
     <div class="setting-item">
       <div class="setting-label"><span>Varian Skin Visualizer</span><span id="skin-val" style="font-size:10px; color:var(--primary); font-weight:600;">Circular Bars</span></div>
       <select id="skin-select" style="width:100%; padding:8px 10px; border-radius:8px; background:rgba(255,255,255,0.06); color:var(--text); border:1px solid var(--border); font-size:12px; cursor:pointer;">
-        <option value="circular-bars">📊 Circular Bars (Avee Classic)</option>
+        <option value="circular-bars">📊 Circular Bars (Nu Classic)</option>
         <option value="waveform-lines">〰️ Waveform Lines (Oscilloscope)</option>
         <option value="geometric-shards">💎 Geometric Shards (Polygonal)</option>
         <option value="cyber-hex">⬡ Cyber Hex (Techno HUD)</option>
@@ -390,7 +390,7 @@ export function generateStandaloneHTML(): string {
   <audio id="audio-el" crossorigin="anonymous"></audio>
 
   <script>
-    // Pure Vanilla Avee Player Audio Visualizer & Video Exporter Engine
+    // Pure Vanilla Nu Audio Visualizer & Video Exporter Engine
     const canvas = document.getElementById('visualizerCanvas');
     const ctx = canvas.getContext('2d');
     const audio = document.getElementById('audio-el');
@@ -411,7 +411,7 @@ export function generateStandaloneHTML(): string {
     const recTimer = document.getElementById('rec-timer');
 
     // Theme state
-    let isLightTheme = localStorage.getItem('avee_standalone_theme') === 'light';
+    let isLightTheme = (localStorage.getItem('nu_standalone_theme') || localStorage.getItem('avee_standalone_theme')) === 'light';
     function updateTheme() {
       if (isLightTheme) {
         document.body.classList.add('light-theme');
@@ -420,7 +420,7 @@ export function generateStandaloneHTML(): string {
         document.body.classList.remove('light-theme');
         btnTheme.textContent = '☀️ Terang';
       }
-      localStorage.setItem('avee_standalone_theme', isLightTheme ? 'light' : 'dark');
+      localStorage.setItem('nu_standalone_theme', isLightTheme ? 'light' : 'dark');
     }
     btnTheme.addEventListener('click', () => {
       isLightTheme = !isLightTheme;
@@ -563,7 +563,7 @@ export function generateStandaloneHTML(): string {
     dctx.fillStyle = '#ffffff';
     dctx.font = 'bold 36px sans-serif';
     dctx.textAlign = 'center';
-    dctx.fillText('AVEE', 128, 140);
+    dctx.fillText('NU', 128, 140);
 
     // Audio Play / Synth Demo
     btnPlay.addEventListener('click', () => {
@@ -775,7 +775,7 @@ export function generateStandaloneHTML(): string {
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = url;
-          a.download = \`avee-visualizer-\${Date.now()}.\${ext}\`;
+          a.download = \`nu-visualizer-\${Date.now()}.\${ext}\`;
           a.click();
         };
 
@@ -1017,7 +1017,7 @@ export function generateStandaloneHTML(): string {
           ctx.restore();
         }
       } else {
-        // Default Circular Bars (Avee Classic)
+        // Default Circular Bars (Nu Classic)
         for (let i = 0; i < bars; i++) {
           let val = 0;
           if (dataArray) {

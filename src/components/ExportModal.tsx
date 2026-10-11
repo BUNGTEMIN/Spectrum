@@ -121,7 +121,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                   onClick={() =>
                     downloadVideoFile(
                       recordingState.downloadUrl!,
-                      recordingState.fileName || `aveeflow-visualizer.${recordingState.format}`
+                      recordingState.fileName || `nu-visualizer.${recordingState.format}`
                     )
                   }
                   className="px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-neutral-950 font-semibold text-xs flex items-center gap-2 shadow-lg shadow-cyan-500/25 transition-all cursor-pointer"

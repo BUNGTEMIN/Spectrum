@@ -28,6 +28,9 @@ export interface VisualizerConfig {
   rotationSpeed: number;
   reactRotation: boolean;
   glowIntensity: number;
+  bloomEffect?: boolean;
+  bloomIntensity?: number;
+  bloomRadius?: number;
   primaryColor: string;
   secondaryColor: string;
   accentColor: string;
@@ -55,6 +58,16 @@ export interface VisualizerConfig {
   showTrackInfo: boolean;
   trackTitle: string;
   trackArtist: string;
+  bpmSyncPulse?: boolean;
+}
+
+export interface BeatData {
+  bpm: number;
+  isBeat: boolean;
+  beatPhase: number;
+  beatPulse: number;
+  confidence: number;
+  tempoLock: boolean;
 }
 
 export interface AudioState {
@@ -68,6 +81,10 @@ export interface AudioState {
   coverUrl: string | null;
   bgUrl: string | null;
   videoElement: HTMLVideoElement | null;
+  bpm?: number;
+  isDetectingBpm?: boolean;
+  bpmConfidence?: number;
+  waveformPeaks?: number[];
 }
 
 export interface RecordingState {
